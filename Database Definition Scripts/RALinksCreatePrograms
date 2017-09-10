@@ -1,0 +1,465 @@
+
+USE RALinks;
+
+-- Functions
+
+DROP FUNCTION IF EXISTS FindPersonCount;
+DROP FUNCTION IF EXISTS FindPersonID;
+DROP FUNCTION IF EXISTS FindAlbumCount;
+DROP FUNCTION IF EXISTS FindComposerClassification;
+DROP FUNCTION IF EXISTS FindTrackID;
+
+delimiter //
+
+
+CREATE FUNCTION FindPersonCount
+(	
+	pPersonDisplayName	VARCHAR(100)
+    , pDateOfBirth		DATE
+	, pDateOfDeath		DATE
+)
+RETURNS INT
+BEGIN
+	DECLARE PersonMatchCount	INT;
+
+	SET PersonMatchCount=0;
+
+	IF pDateOfBirth IS NOT NULL AND
+	   pDateOfDeath IS NOT NULL THEN
+		SELECT COUNT(PersonID) INTO PersonMatchCount
+		  FROM RALinks.Person
+		 WHERE UPPER(PersonDisplayName) = UPPER(pPersonDisplayName)
+           and DateOfBirth = pDateOfBirth
+           and DateOfDeath = pDateOfDeath;
+	END IF;
+
+	IF PersonMatchCount=0 AND
+	   pDateOfBirth IS NOT NULL THEN
+		SELECT COUNT(PersonID) INTO PersonMatchCount
+		  FROM RALinks.Person
+		 WHERE UPPER(PersonDisplayName) = UPPER(pPersonDisplayName)
+           and DateOfBirth = pDateOfBirth;
+	END IF;
+
+	IF PersonMatchCount=0 AND
+	   pDateOfDeath IS NOT NULL THEN
+		SELECT COUNT(PersonID) INTO PersonMatchCount
+		  FROM RALinks.Person
+		 WHERE UPPER(PersonDisplayName) = UPPER(pPersonDisplayName)
+           and DateOfDeath = pDateOfDeath;
+	END IF;
+
+	IF PersonMatchCount=0 THEN
+		SELECT COUNT(PersonID) INTO PersonMatchCount
+		  FROM RALinks.Person
+		 WHERE UPPER(PersonDisplayName) = UPPER(pPersonDisplayName);
+	END IF;
+
+	RETURN(PersonMatchCount);
+END//
+
+
+CREATE FUNCTION FindPersonID
+(
+	pPersonDisplayName	VARCHAR(100)
+)
+RETURNS INT
+BEGIN
+	DECLARE wPersonID	INT;
+
+	SELECT PersonID INTO wPersonID
+	  FROM RALinks.Person
+	 WHERE PersonDisplayName = pPersonDisplayName;
+
+	RETURN (wPersonID);
+END//
+
+CREATE FUNCTION FindAlbumCount
+(
+	pAlbumDisplayName	VARCHAR(100)
+	, pCopyrightYear	INT
+	, pArtistID			INT
+)
+RETURNS INT
+BEGIN
+	DECLARE AlbumMatchCount		INT;
+
+	SET AlbumMatchCount = 0;
+
+	IF pCopyrightYear IS NOT NULL AND
+	   pArtistID IS NOT NULL THEN
+		SELECT COUNT(AlbumID) INTO AlbumMatchCount
+		  FROM RALinks.Album
+		 WHERE UPPER(AlbumDisplayName) = UPPER(pAlbumDisplayName) 
+		   AND CopyrightYear = pCopyrightYear
+		   AND ArtistID = pArtistID;
+	END IF;
+
+	IF AlbumMatchCount=0 AND
+	   pArtistID IS NOT NULL THEN
+		SELECT COUNT(AlbumID) INTO AlbumMatchCount
+		  FROM RALinks.Album
+		 WHERE UPPER(AlbumDisplayName) = UPPER(pAlbumDisplayName) 
+		   AND ArtistID = pArtistID;
+	END IF;
+
+	IF AlbumMatchCount=0 AND
+	   pCopyrightYear IS NOT NULL THEN
+		SELECT COUNT(AlbumID) INTO AlbumMatchCount
+		  FROM RALinks.Album
+		 WHERE UPPER(AlbumDisplayName) = UPPER(pAlbumDisplayName) 
+		   AND CopyrightYear = pCopyrightYear;
+	END IF;
+
+	IF AlbumMatchCount=0 THEN
+		SELECT COUNT(AlbumID) INTO AlbumMatchCount
+		  FROM RALinks.Album
+		 WHERE UPPER(AlbumDisplayName) = UPPER(pAlbumDisplayName);
+	END IF;
+
+	RETURN(AlbumMatchCount);
+END//
+
+CREATE FUNCTION FindComposerClassification
+(
+	pComposerDesc	VARCHAR(50)
+)
+RETURNS INT
+BEGIN
+	DECLARE WorkingComposerClsCd		INT;
+	DECLARE WorkingDescriptionRoot		VARCHAR(50);
+	DECLARE WorkingDescriptionModifier	VARCHAR(50);
+
+	SET WorkingDescriptionRoot = SUBSTRING_INDEX(pComposerDesc, ' ', -1);
+
+	IF LENGTH(WorkingDescriptionRoot) = LENGTH(pComposerDesc) THEN
+		SET WorkingDescriptionModifier = NULL;
+
+		SELECT ComposerClsCd INTO WorkingComposerClsCd
+		  FROM RALinks.ComposerCls
+		 WHERE UPPER(ComposerClsGroupDesc) = UPPER(WorkingDescriptionRoot)
+		   AND ComposerClsSubGroupDesc IS NULL;
+	ELSE
+		SET WorkingDescriptionModifier = 
+		    SUBSTRING(pComposerDesc, 1, (LENGTH(pComposerDesc) - LENGTH(WorkingDescriptionRoot)));
+
+		SELECT ComposerClsCd INTO WorkingComposerClsCd
+		  FROM RALinks.ComposerCls
+		 WHERE UPPER(ComposerClsGroupDesc) = UPPER(WorkingDescriptionRoot)
+		   AND UPPER(ComposerClsSubGroupDesc) = UPPER(WorkingDescriptionModifier);
+	END IF;
+
+	IF WorkingComposerClsCd IS NULL THEN
+		SELECT ComposerClsCd INTO WorkingComposerClsCd
+		  FROM RALinks.ComposerCls
+		 WHERE UPPER(ComposerClsGroupDesc) = UPPER(pComposerDesc)
+		   AND ComposerClsSubGroupDesc IS NULL;
+	END IF;
+
+	IF WorkingComposerClsCd IS NULL THEN
+		SELECT ComposerClsCd INTO WorkingComposerClsCd
+		  FROM RALinks.ComposerMapping
+		 WHERE UPPER(ComposerKeyword) = UPPER(pComposerDesc);
+	END IF;
+
+	IF WorkingComposerClsCd IS NULL THEN
+		SET WorkingComposerClsCd = 1;
+	END IF;
+
+RETURN (WorkingComposerClsCd);
+
+END//
+
+CREATE FUNCTION FindTrackID
+(
+	pAlbumID			INT
+	,pSongID			INT
+	,pTrackNbr			INT
+)
+RETURNS INT
+BEGIN
+	DECLARE wTrackID	INT;
+
+	SELECT TrackID INTO wTrackID
+	  FROM RALinks.Track
+	 WHERE AlbumID = pAlbumID
+	   AND SongID = pSongID
+	   AND TrackNbr = pTrackNbr;
+
+	RETURN(wTrackID);
+END//
+
+
+
+delimiter ;
+
+-- Procedures
+
+DROP PROCEDURE IF EXISTS PlacePerson;
+DROP PROCEDURE IF EXISTS PlaceArtist;
+DROP PROCEDURE IF EXISTS PlaceAlbum;
+DROP PROCEDURE IF EXISTS PlaceSong;
+DROP PROCEDURE IF EXISTS AttributeComposer;
+DROP PROCEDURE IF EXISTS ListTrack;
+DROP PROCEDURE IF EXISTS AttributeContribution;
+
+delimiter //
+
+
+CREATE PROCEDURE PlacePerson
+(	
+	IN pPersonDisplayName	VARCHAR(100)
+    , IN pDateOfBirth		DATE
+	, IN pDateOfDeath		DATE
+	, IN pPersonNotes		VARCHAR(8000)
+	, OUT pPersonID			INT
+)
+BEGIN
+	DECLARE WorkingPersonID		INT;
+	DECLARE PersonMatchCount	INT;
+
+	IF FindPersonCount(pPersonDisplayName, pDateOfBirth, pDateOfDeath)=0 THEN
+		INSERT INTO RALinks.Person (PersonDisplayName, DateOfBirth, DateOfDeath, PersonNotes)
+			   VALUES (pPersonDisplayName, pDateOfBirth, pDateOfDeath, pPersonNotes);
+	END IF;
+
+	SELECT COUNT(PersonID) INTO PersonMatchCount
+	  FROM RALinks.Person
+	 WHERE UPPER(PersonDisplayName) = UPPER(pPersonDisplayName)
+       and DateOfBirth = pDateOfBirth
+       and DateOfDeath = pDateOfDeath;
+
+	SELECT MAX(PersonID) INTO pPersonID
+	  FROM RALinks.Person
+	 WHERE UPPER(PersonDisplayName) = pPersonDisplayName;
+
+END//
+
+
+CREATE PROCEDURE PlaceArtist
+(
+    IN pArtistDisplayName 		VARCHAR(100)
+	, IN pArtistNotes			VARCHAR(8000)
+    , OUT pArtistID				INT
+)
+begin
+	DECLARE	WorkingArtistID		INT;
+
+	SELECT ArtistID INTO WorkingArtistID 
+	FROM RALinks.Artist
+	WHERE ArtistDisplayName = pArtistDisplayName;
+
+	if WorkingArtistId IS NULL THEN 
+		INSERT INTO RALinks.Artist (ArtistDisplayName, ArtistNotes)
+		VALUES (pArtistDisplayName, pArtistNotes);
+
+		SELECT ArtistID INTO WorkingArtistID 
+		FROM RALinks.Artist
+		WHERE ArtistDisplayName = pArtistDisplayName;
+	END IF;		
+
+	if WorkingArtistID IS NULL THEN
+		SET pArtistID = 0;
+	ELSE
+		SET pArtistID = WorkingArtistID;
+	END IF;
+end//
+
+
+CREATE PROCEDURE PlaceAlbum
+(
+	IN pAlbumDisplayName		VARCHAR(100)
+    , IN pCopyrightYear			INT
+    , IN pArtistID				INT
+    , IN pVariousArtistsInd		BOOLEAN
+    , IN pCompilationInd    	BOOLEAN
+    , IN pSoundtrackInd     	BOOLEAN
+	, IN pAlbumNotes			VARCHAR(8000)
+	, OUT pAlbumID				INT
+)
+BEGIN
+	DECLARE WorkingAlbumID		INT;
+
+	IF FindAlbumCount(pAlbumDisplayName, pCopyrightYear, pArtistID)=0 THEN
+		INSERT INTO RALinks.Album (AlbumDisplayName
+								  ,CopyrightYear
+								  ,ArtistID
+								  ,VariousArtistsInd
+								  ,CompilationInd
+								  ,SoundtrackInd
+								  ,AlbumNotes)
+						   VALUES (pAlbumDisplayName
+								  ,pCopyrightYear
+								  ,pArtistID
+								  ,pVariousArtistsInd
+								  ,pCompilationInd
+								  ,pSoundtrackInd
+								  ,pAlbumNotes);
+	END IF;
+	
+	SELECT MAX(AlbumID) INTO WorkingAlbumID
+	  FROM RALinks.Album
+	 WHERE AlbumDisplayName = pAlbumDisplayName
+	   AND CopyrightYear = pCopyrightYear
+	   AND ArtistID = pArtistID;
+
+	SET pAlbumID = WorkingAlbumID;
+
+END//
+
+CREATE PROCEDURE PlaceSong
+(
+	IN pSongTitle			VARCHAR(100)
+    , IN pCopyrightYear		INT
+	, IN pSongNotes			VARCHAR(8000)
+	, OUT pSongID			INT
+)
+BEGIN
+	DECLARE WorkingSongID		INT;
+
+	SELECT SongID INTO WorkingSongID
+	  FROM RALinks.Song
+	 WHERE SongTitle = pSongTitle
+       AND CopyrightYear = pCopyrightYear;
+
+	IF WorkingSongID IS NULL THEN
+		INSERT INTO RALinks.Song (SongTitle, CopyrightYear, SongNotes)
+		VALUES (pSongTitle, pCopyrightYear, pSongNotes);
+
+		SELECT SongID INTO WorkingSongID
+		  FROM RALinks.Song
+		 WHERE SongTitle = pSongTitle
+		   AND CopyrightYear = pCopyrightYear;
+	END IF;
+
+	SET pSongID = WorkingSongID;
+
+END//
+
+CREATE PROCEDURE AttributeComposer
+(
+	IN pSongID					INT
+	, IN pComposerDisplay		VARCHAR(50)
+	, IN pPersonDisplayName		VARCHAR(100)
+	, IN pComposerDesc			VARCHAR(50)
+	, IN pQualityCode			INT
+)
+BEGIN
+	DECLARE wPersonID			INT;
+	DECLARE wComposerDisplay	VARCHAR(50);
+	DECLARE wPersonDisplayName	VARCHAR(100);
+	DECLARE wComposerClsCd		INT;
+	DECLARE wQualityCode		INT;
+
+	IF pPersonDisplayName IS NULL THEN 
+		SET wPersonID = FindPersonID(pComposerDisplay);
+		SET wPersonDisplayName = pComposerDisplay;
+	ELSE
+		SET wPersonID = FindPersonID(pPersonDisplayName);
+		SET wPersonDisplayName = pPersonDisplayName;
+	END IF;
+
+	IF pComposerDisplay IS NULL THEN
+		SET wComposerDisplay = pPersonDisplayName;
+	ELSE
+		SET wComposerDisplay = pComposerDisplay;
+	END IF;
+
+	SET wComposerClsCd = FindComposerClassification(pComposerDesc);
+
+-- add check for duplicates before insert
+
+	INSERT INTO RALinks.Composer(PersonID
+								, SongID
+								, ComposerDisplay
+								, ComposerDesc
+								, ComposerClsCd
+								, QualityCode)
+	     VALUES (wPersonID
+				, pSongID
+				, wComposerDisplay
+				, pComposerDesc
+				, wComposerClsCd
+				, pQualityCode);
+
+END//
+
+CREATE PROCEDURE ListTrack
+(
+	IN pAlbumID			INT
+	, IN pSongID		INT
+	, IN pTrackNbr		INT
+	, IN pLiveInd		BOOLEAN
+	, IN pCoverInd		BOOLEAN
+	, IN pMinutes		INT
+	, IN pSeconds		INT
+	, OUT pTrackID		INT
+)
+BEGIN
+	DECLARE wSecondsDuration	INT;
+
+	SET wSecondsDuration = ((pMinutes * 60) + pSeconds);
+
+	INSERT INTO RALinks.Track(AlbumID
+							 ,SongID
+							 ,TrackNbr
+							 ,LiveInd
+							 ,CoverInd
+							 ,SecondsDuration)
+		VALUES (pAlbumID
+			   ,pSongID
+			   ,pTrackNbr
+			   ,pLiveInd
+			   ,pCoverInd
+			   ,wSecondsDuration);
+
+	SET pTrackId = FindTrackID(pAlbumID, pSongID, pTrackNbr);
+END//
+
+
+CREATE PROCEDURE AttributeContribution
+(
+	IN pTrackID					INT
+	, IN pContributorDisplay	VARCHAR(50)
+	, IN pPersonDisplayName		VARCHAR(100)
+	, IN pContributionDesc      VARCHAR(50)
+	, IN pAlbumLevelAttribution	BOOLEAN
+	, IN pMemberOfArtistInd		BOOLEAN
+	, IN pQualityCode			INT
+)
+BEGIN
+	DECLARE wPersonID			INT;
+	DECLARE wContributorDisplay	VARCHAR(50);
+
+	IF pPersonDisplayName IS NULL THEN 
+		SET wPersonID = FindPersonID(pContributorDisplay);
+	ELSE
+		SET wPersonID = FindPersonID(pPersonDisplayName);
+	END IF;
+
+	IF pContributorDisplay IS NULL THEN
+		SET wContributorDisplay = pPersonDisplayName;
+	ELSE
+		SET wContributorDisplay = pContributorDisplay;
+	END IF;
+
+	INSERT INTO RALinks.Contribution (PersonID 
+									 ,TrackID
+									 ,ContributorDisplay
+									 ,ContributionDesc
+									 ,ContributionClsCd
+									 ,AlbumLevelAttribution
+									 ,MemberOfArtistInd
+									 ,QualityCode)
+		VALUES (wPersonID
+			   ,pTrackID
+			   ,wContributorDisplay
+			   ,pContributionDesc
+			   ,0
+			   ,pAlbumLevelAttribution
+			   ,pMemberOfArtistInd
+			   ,pQualityCode);
+END//
+
+
+delimiter ;

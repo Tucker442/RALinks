@@ -1,0 +1,279 @@
+DROP DATABASE IF EXISTS RALinks;
+CREATE DATABASE IF NOT EXISTS RALinks;
+ 
+-- Entity Tables   
+ 
+DROP TABLE IF EXISTS RALinks.Person;
+CREATE TABLE IF NOT EXISTS RALinks.Person
+(
+    PersonID                INT             NOT NULL    UNIQUE AUTO_INCREMENT
+    , PersonDisplayName     VARCHAR(100)    NOT NULL
+    , ConnectionIndex       INT             NULL        DEFAULT 0
+    , DateOfBirth           DATE            NULL
+    , DateOfDeath           DATE            NULL
+    , PersonNotes			VARCHAR(8000)	NULL
+	, CreateDt				TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+);
+ 
+DROP TABLE IF EXISTS RALinks.Artist;
+CREATE TABLE IF NOT EXISTS RALinks.Artist
+(
+    ArtistID            INT             NOT NULL    UNIQUE AUTO_INCREMENT
+    , ArtistDisplayName VARCHAR(100)    NOT NULL
+    , ArtistNotes		VARCHAR(8000)	NULL
+	, CreateDt			TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+);
+ 
+DROP TABLE IF EXISTS RALinks.Album;
+CREATE TABLE IF NOT EXISTS RALinks.Album
+(
+    AlbumID             INT             NOT NULL    UNIQUE  AUTO_INCREMENT
+    , AlbumDisplayName  VARCHAR(100)    NOT NULL
+    , CopyrightYear     INT             NULL
+    , ArtistID          INT             NULL
+	, NumberOfTracks	INT				NULL
+    , VariousArtistsInd BOOLEAN         NOT NULL    DEFAULT 0
+    , CompilationInd    BOOLEAN         NOT NULL    DEFAULT 0
+    , SoundtrackInd     BOOLEAN         NOT NULL    DEFAULT 0
+	, AlbumNotes		VARCHAR(8000)	NULL
+	, CreateDt			TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+);
+ 
+DROP TABLE IF EXISTS RALinks.Song;
+CREATE TABLE IF NOT EXISTS RALinks.Song
+(
+	SongID				INT             NOT NULL    UNIQUE  auto_increment
+	, SongTitle			varchar(100)	NOT NULL
+    , CopyrightYear     INT             NULL
+	, SongNotes			VARCHAR(8000)	NULL
+	, CreateDt			TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+);
+
+DROP TABLE IF EXISTS RALinks.Track;
+CREATE TABLE IF NOT EXISTS RALinks.Track
+(
+    TrackID             INT             NOT NULL    UNIQUE  AUTO_INCREMENT
+    , AlbumID           INT             NOT NULL
+    , SongID			INT				NOT NULL
+	, TrackNbr			INT				NULL
+    , LiveInd           BOOLEAN			NOT NULL	default 0
+	, CoverInd			BOOLEAN			NOT NULL
+    , SecondsDuration   INT             NULL
+	, TrackNotes		VARCHAR(8000)	NULL
+	, CreateDt			TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+);
+ 
+DROP TABLE IF EXISTS RALinks.Playlist;
+CREATE TABLE IF NOT EXISTS RALinks.Playlist
+(
+	PlaylistNbr							INT			NOT NULL
+	, PlaylistVersion					INT			NOT NULL
+	, PlaylistName						VARCHAR(50)	NOT NULL
+	, PlaylistMostCurrentVerionInd		BOOLEAN		NOT NULL	DEFAULT 1
+	, CreateDt							TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+
+	, CONSTRAINT Playlist_pk	PRIMARY KEY (PlaylistNbr, PlaylistVersion)
+);
+
+DROP TABLE IF EXISTS RALinks.PlaylistTrack;
+CREATE TABLE IF NOT EXISTS RALinks.PlaylistTrack
+(
+	PlaylistNbr					INT			NOT NULL
+	, PlaylistVersion			INT			NOT NULL
+	, PlaylistTrackNbr			INT			NOT NULL
+	, TrackID					INT			NOT NULL
+	, PlaylistTrackSortOrder	INT			NOT NULL
+	, CreateDt					TIMESTAMP	NOT NULL	DEFAULT CURRENT_TIMESTAMP
+
+	, CONSTRAINT PlaylistTrack_pk	PRIMARY KEY (PlaylistNbr, PlaylistVersion, PlaylistTrackNbr)
+);
+ 
+
+-- Relationship Tables
+ 
+DROP TABLE IF EXISTS RALinks.Contribution;
+CREATE TABLE IF NOT EXISTS RALinks.Contribution
+(
+    ContributionID      	INT         NOT NULL    UNIQUE  AUTO_INCREMENT
+    , PersonID          	INT         NOT NULL
+    , TrackID           	INT         NOT NULL
+	, ContributorDisplay	VARCHAR(50)	NOT NULL
+    , ContributionDesc      VARCHAR(50) NOT NULL
+    , ContributionClsCd   	INT         NOT NULL
+	, AlbumLevelAttribution	BOOLEAN		NOT NULL	DEFAULT 0
+    , MemberOfArtistInd 	BOOLEAN		NOT NULL	DEFAULT 0
+    , QualityCode       	INT         NOT NULL
+	, CreateDt				TIMESTAMP	NOT NULL	DEFAULT CURRENT_TIMESTAMP
+); 
+
+DROP TABLE IF EXISTS RALinks.Composer;
+CREATE TABLE IF NOT EXISTS RALinks.Composer
+(
+    ComposerID          INT         NOT NULL    UNIQUE  AUTO_INCREMENT
+    , PersonID          INT         NOT NULL
+    , SongID            INT         NOT NULL
+	, ComposerDisplay	VARCHAR(50)	NOT NULL
+    , ComposerDesc      VARCHAR(50) NOT NULL
+    , ComposerClsCd     INT         NOT NULL
+    , QualityCode       INT         NOT NULL
+	, CreateDt			TIMESTAMP	NOT NULL	DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+-- Mapping Tables
+
+DROP TABLE IF EXISTS RALinks.ContributionMapping;
+CREATE TABLE IF NOT EXISTS RALinks.ContributionMapping
+(
+	ContributionKeyword		CHAR(50)	NOT NULL	UNIQUE
+	, ContributionClsCd		INT			NOT NULL
+);
+
+DROP TABLE IF EXISTS RALinks.ComposerMapping;
+CREATE TABLE IF NOT EXISTS RALinks.ComposerMapping
+(
+	ComposerKeyword		CHAR(50)	NOT NULL	UNIQUE
+	, ComposerClsCd		INT			NOT NULL
+);
+ 
+
+-- Lookup Tables
+
+DROP TABLE IF EXISTS RALinks.ContributionCls;
+CREATE TABLE IF NOT EXISTS RALinks.ContributionCls
+(
+	ContributionClsCd				INT			NOT NULL	UNIQUE	AUTO_INCREMENT
+	, ContributionClsGroupDesc		VARCHAR(50)	NOT NULL
+	, ContributionClsSubGroupDesc	VARCHAR(50) NULL
+    , ContributionClsMusicianInd  	BOOLEAN		NULL
+	, ContributionClsReviewedInd	BOOLEAN		NOT NULL	DEFAULT 0
+	, CreateDt						TIMESTAMP	NOT NULL	DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO RALinks.ContributionCls
+		(ContributionClsGroupDesc
+        , ContributionClsSubGroupDesc
+        , ContributionClsMusicianInd
+        , ContributionClsReviewedInd)
+	   VALUES
+		('Unrecognized',NULL,NULL,0)
+       ,('Guitar',NULL,1,1)
+       ,('Bass',NULL,1,1)
+       ,('Drums',NULL,1,1)
+       ,('Keyboards',NULL,1,1)
+	   ,('Vocals',NULL,1,1)
+		;
+
+DROP TABLE IF EXISTS RALinks.ComposerCls;
+CREATE TABLE IF NOT EXISTS RALinks.ComposerCls
+(
+	ComposerClsCd				INT			NOT NULL	UNIQUE	AUTO_INCREMENT
+	, ComposerClsGroupDesc		VARCHAR(50)	NOT NULL
+	, ComposerClsSubGroupDesc	VARCHAR(50)	NULL
+	, ComposerClsReviewedInd	BOOLEAN		NOT NULL	DEFAULT 0
+	, CreateDt					TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO RALinks.ComposerCls
+		(ComposerClsGroupDesc
+		, ComposerClsSubGroupDesc
+		, ComposerClsReviewedInd)
+	   VALUES
+		('Unrecognized',NULL,0)
+	   ,('Composition',NULL,1)
+	   ,('Music',NULL,1)
+	   ,('Lyrics',NULL,1)
+		;
+
+drop table if exists RALinks.QualityLkup;
+create table if not exists RALinks.QualityLkup
+(
+	QualityCode			INT				NOT NULL 		unique  
+	, QualityDesc		VARCHAR(50)     NOT NULL	
+	, CreateDt			TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+
+);
+
+insert into RALinks.QualityLkup
+		(QualityCode, QualityDesc)
+	   values
+		(10, 'Liner Notes')
+	   ,(20, 'Liner Notes (borrowed)')
+	   ,(30, 'Discogs.com')
+	   ,(40, 'AllMusic.com')
+       ,(50, 'Wikipedia.com')
+	   ,(100, 'Rumor and Hearsay');
+
+
+
+-- Accelerator Tables
+ 
+DROP TABLE IF EXISTS RALinks.DirectConnectionAlbum;
+CREATE TABLE IF NOT EXISTS RALinks.DirectConnectionAlbum
+(
+    PersonIDLow     INT
+    , PersonIDHigh  INT
+    , AlbumID	    INT
+	, CreateDt		TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+
+    , CONSTRAINT DirectConnection_pk    PRIMARY KEY (PersonIDLow
+                                                    ,PersonIDHigh
+													,AlbumID)
+);
+
+DROP TABLE IF EXISTS RALinks.DirectConnectionAlbumCount;
+CREATE TABLE IF NOT EXISTS RALinks.DirectConnectionAlbumCount
+(
+    PersonIDLow		INT
+    , PersonIDHigh  INT
+    , AlbumCount    INT
+    , Distance		INT
+	, CreateDt		TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+
+    , CONSTRAINT DirectConnection_pk    PRIMARY KEY (PersonIDLow
+                                                    ,PersonIDHigh)
+);
+ 
+
+DROP TABLE IF EXISTS RALinks.DirectConnectionTrack;
+CREATE TABLE IF NOT EXISTS RALinks.DirectConnectionTrack
+(
+    PersonIDLow		INT
+  , PersonIDHigh    INT
+  , TrackID			INT
+  , CreateDt		TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+
+  , CONSTRAINT DirectConnection_pk    PRIMARY KEY (PersonIDLow
+                                                  ,PersonIDHigh
+												  ,TrackID)
+);
+
+DROP TABLE IF EXISTS RALinks.DirectConnectionTrackCount;
+CREATE TABLE IF NOT EXISTS RALinks.DirectConnectionTrackCount
+(
+    PersonIDLow		INT
+  , PersonIDHigh    INT
+  , TrackCount		INT
+  , Distance		INT
+  , CreateDt		TIMESTAMP		NOT NULL	DEFAULT CURRENT_TIMESTAMP
+
+  , CONSTRAINT DirectConnection_pk    PRIMARY KEY (PersonIDLow
+                                                  ,PersonIDHigh)
+);
+ 
+
+-- Work tables (convert to temporary tables)
+ 
+DROP TABLE IF EXISTS RALinks.workConnection;
+CREATE TABLE IF NOT EXISTS RALinks.workConnection
+(
+    PersonIDLow     INT
+  , PersonIDHigh    INT
+  , AlbumID         INT
+  , Distance		int
+  , CONSTRAINT workConnection_pk      PRIMARY KEY (PersonIDLow
+                                                  ,PersonIDHigh
+                                                  ,AlbumID)
+);
+ 

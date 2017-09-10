@@ -1,0 +1,11 @@
+
+
+DROP VIEW IF EXISTS RALinks.vAlbum;
+CREATE VIEW  RALinks.vAlbum AS
+	SELECT r.ArtistDisplayName
+         , a.AlbumDisplayName
+		 , a.CopyrightYear
+	  FROM RALinks.Album a left join
+		   RALinks.Artist r on a.ArtistID = r.ArtistID
+	 ORDER BY r.ArtistDisplayName
+		    , a.CopyrightYear;
